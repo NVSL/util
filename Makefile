@@ -1,0 +1,6 @@
+
+default:
+	./checkpy.py
+
+clean:
+
