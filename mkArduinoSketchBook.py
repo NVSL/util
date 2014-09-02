@@ -15,7 +15,7 @@ from lxml import html
 from lxml import etree
 
 parser = argparse.ArgumentParser(description="Tool to build an arduino sketch book and library folder that has all our components in it.")
-parser.add_argument("gcom", type=str, nargs='+', help="Component manifest files")
+parser.add_argument("--gcom", required=False, type=str, nargs='+', dest='gcom', help="Component manifest files")
 parser.add_argument("--target", required=False, type=str, nargs=1, dest='target', help="Name of the sketchbook")
 parser.add_argument("-n", required=False, action="store_true", dest='simulate', default=False, help="Just print what would be done")
 
