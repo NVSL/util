@@ -1,14 +1,14 @@
 from lxml import etree as ET;
-import pipes
 
 def formatAndWrite(tree, file, encoding="us-ascii", xml_declaration=None, method="xml"):
-    t = pipes.Template()
-    t.append("xmllint --format $IN", "f-")
-    tree.write(t.open(file, 'w'), encoding=encoding, xml_declaration=xml_declaration, method=method)
+    open(file, 'w').write(ET.tostring(tree, 
+                                      pretty_print = True,
+                                      encoding=encoding, 
+                                      xml_declaration=xml_declaration, 
+                                      method=method))
 
 def formatAndWriteString(s, f):
     r = ET.fromstring(s)
     et = ET.ElementTree()
     et._setroot(r)
-    print et
     formatAndWrite(et,f)
