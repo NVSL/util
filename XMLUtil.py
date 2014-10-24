@@ -18,7 +18,7 @@ def indent(elem, level=0):
 def formatAndWrite(tree, file, encoding="us-ascii", xml_declaration=None, method="xml"):
     indent(tree.getroot());
     f = open(file, 'w')
-    f.write("""<?xml version="1.0"?>""")
+    f.write("""<?xml version="1.0"?>\n""")
     f.write(ET.tostring(tree))
 
 def formatAndWriteString(s, f):
