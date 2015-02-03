@@ -62,7 +62,7 @@ for signal in eagle.getSignals():
         first_part = signal.attrib['name'][0:-2]
         #Give it a new name unlikely to collide with anything else
         signal.attrib['name'] = first_part + "_" + hashlib.md5(signal.attrib['name']).hexdigest()[0:5]
-        log.info("Removed differential pair" + first_part)
+        log.info("Removed differential pair " + first_part)
 
 #Find the autorouter effort AND PUSH IT TO THE LIMIT
 #PAST THE POINT OF NO RETURN
