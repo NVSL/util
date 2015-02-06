@@ -73,16 +73,16 @@ auto_settings = {
     'TopRouterVariant':'1'
 }
 
-for rpass in eagle.getAutorouter():
-    if rpass.attrib['name']=='Default':
+for router_pass in eagle.getAutorouter():
+    if router_pass.attrib['name']=='Default':
         for k in auto_settings.keys():
-            if len(rpass.findall("param[@name='{0}']".format(k)))==0:
+            if len(router_pass.findall("param[@name='{0}']".format(k)))==0:
                 e = ET.Element('param')
                 e.attrib['name']= k
-                rpass.append(e)
+                router_pass.append(e)
                 log.info("Added autorouter " + k + " element")
 
-        for param in rpass:
+        for param in router_pass:
             if param.attrib['name'] in auto_settings.keys():
                 param.attrib['value'] = auto_settings[param.attrib['name']]
             elif param.attrib['name'].startswith('PrefDir') and param.attrib['value'] != '0':
