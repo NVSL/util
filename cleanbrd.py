@@ -68,11 +68,20 @@ for signal in eagle.getSignals():
 #Find the autorouter effort AND PUSH IT TO THE LIMIT
 #PAST THE POINT OF NO RETURN
 auto_settings = {
-    'RoutingGrid':'0.25mm',
+    'RoutingGrid':'0.12mm',
     'AutoGrid':'1',
     'Efforts':'2',
-    'TopRouterVariant':'1'
+    'TopRouterVariant':'1',
+    'PrefDir.1': 'a',
+    'PrefDir.16': 'a'
 }
+
+if args.layers:
+    auto_settings['PrefDir.2'] = 'a'
+    auto_settings['PrefDir.3'] = 'a'
+
+
+route_layers = [1,2,3,16]
 
 for router_pass in eagle.getAutorouter():
     if router_pass.attrib['name']=='Default':
@@ -88,14 +97,13 @@ for router_pass in eagle.getAutorouter():
         for param in router_pass:
             if param.attrib['name'] in auto_settings.keys():
                 param.attrib['value'] = auto_settings[param.attrib['name']]
-            elif param.attrib['name'].startswith('PrefDir') and param.attrib['value'] != '0':
-                param.attrib['value'] = 'a'
+            elif param.attrib['name'].startswith('PrefDir'):
+                param.attrib['value'] = '0'
             else:
                 continue
             log.info("Changed autorouter setting " + param.attrib['name'])
 
 if args.layers:
-    route_layers = [1,2,3,16]
     route_names = {
         1:'Top',
         2:'Route2',
