@@ -32,6 +32,7 @@ parser = argparse.ArgumentParser(description="Clean up a board for the autoplace
 parser.add_argument("-i","--inbrd",required=True)
 parser.add_argument("-o","--outbrd",required=True)
 parser.add_argument("-v",help="Verbose",action="store_true")
+parser.add_argument("--layers", action="store_true", help="Convert to 4 layer", required=False)
 args = parser.parse_args()
 
 if args.v:
@@ -75,6 +76,7 @@ auto_settings = {
 
 for router_pass in eagle.getAutorouter():
     if router_pass.attrib['name']=='Default':
+        #Add autorouter settings if they're not there
         for k in auto_settings.keys():
             if len(router_pass.findall("param[@name='{0}']".format(k)))==0:
                 e = ET.Element('param')
@@ -82,6 +84,7 @@ for router_pass in eagle.getAutorouter():
                 router_pass.append(e)
                 log.info("Added autorouter " + k + " element")
 
+        #Change the settings to what we want
         for param in router_pass:
             if param.attrib['name'] in auto_settings.keys():
                 param.attrib['value'] = auto_settings[param.attrib['name']]
@@ -90,6 +93,51 @@ for router_pass in eagle.getAutorouter():
             else:
                 continue
             log.info("Changed autorouter setting " + param.attrib['name'])
+
+if args.layers:
+    route_layers = [1,2,3,16]
+    route_names = {
+        1:'Top',
+        2:'Route2',
+        3:'Route3',
+        16:'Bottom'
+    }
+    route_colors = {
+        1:"4",
+        2:"13",
+        3:"11",
+        16:"1"
+    }
+
+
+    for layer in route_layers:
+        if eagle.getLayers().find("layer[@number='{0}']".format(layer)) is None:
+            e=ET.Element('layer')
+            e.attrib['number'] = str(layer)
+            eagle.getLayers().append(e)
+            log.info('Added layer ' + str(layer))
+
+    nlayers = int(args.layers)
+    for layer in eagle.getLayers():
+        layer_num = int(layer.attrib['number'])
+        if 1 <= layer_num <= 16:
+            if layer_num in route_layers:
+                layer.attrib['visible']='yes'
+                layer.attrib['active']='yes'
+                layer.attrib['fill']='1'
+                layer.attrib['color']=route_colors[layer_num]
+                layer.attrib['name'] = route_names[layer_num]
+            else:
+                layer.attrib['visible']='no'
+                layer.attrib['active']='no'
+
+    if eagle.getDesignrules().find("param[@name='layerSetup']") is None:
+        e =ET.Element('param')
+        e.attrib['name']='layerSetup'
+        eagle.getDesignrules().append(e)
+
+    lsetup = eagle.getDesignrules().find("param[@name='layerSetup']")
+    lsetup.attrib['value']='(1*2*3*16)'
 
 
 
