@@ -16,6 +16,10 @@ import itertools
 import hashlib
 import re
 import logging as log
+from PlacerBoard import PlacerBoard
+import lxml
+import traceback
+import sys
 
 def make_wire(start,end):
     w = ET.Element('wire')
@@ -26,6 +30,28 @@ def make_wire(start,end):
     w.set('x2',str(end[0]))
     w.set('y2',str(end[1]))
     return w
+
+#Convert a hash into a list of key-value xml elements
+#Each takes the form <tag_name name="key" value="value"/>
+def add_key_value_params(root_element, keyval_dict):
+    #Add settings if they're not there
+    for k in keyval_dict.keys():
+        if len(root_element.findall("param[@name='{0}']".format(k)))==0:
+            e = ET.Element('param')
+            e.attrib['name']= k
+            root_element.append(e)
+            log.info("Added " + k + " element to " + root_element.tag)
+
+    #Change the settings to what we want
+    for param in root_element:
+        if param.attrib.get('name') in keyval_dict.keys():
+            param.attrib['value'] = keyval_dict[param.attrib['name']]
+        else:
+            continue
+        log.info("Changed setting {0} to {1} in {2}".format(param.attrib['name'],
+                                                             param.attrib['value'],
+                                                             root_element.tag))
+
 
 
 parser = argparse.ArgumentParser(description="Clean up a board for the autoplacer and autorouter")
@@ -38,7 +64,14 @@ args = parser.parse_args()
 if args.v:
     log.basicConfig(level=log.DEBUG)
 
-eagle = EagleBoard(args.inbrd)
+try:
+    eagle = EagleBoard(args.inbrd)
+except lxml.etree.XMLSyntaxError as e:
+    print args.inbrd + " is bugged"
+    print traceback.format_exc()
+    sys.exit(-1)
+
+
 plain = eagle.getPlain()
 outline = Component.get_bounding_rectangle(plain)
 
@@ -103,6 +136,34 @@ for router_pass in eagle.getAutorouter():
                 continue
             log.info("Changed autorouter setting " + param.attrib['name'])
 
+
+
+
+#Change DRC rules to help with routing
+drc_rules = {
+    'mdWireWire': '6mil',
+    'mdWirePad' : '6mil',
+    'mdWireVia' : '6mil',
+    'mdPadPad'  : '6mil',
+    'mdPadVia'  : '6mil',
+    'mdViaVia'  : '6mil',
+    'mdSmdPad'  : '6mil',
+    'mdSmdVia'  : '6mil',
+    'mdSmdSmd'  : '6mil'
+}
+
+placerboard = PlacerBoard()
+placerboard.import_board(eagle)
+
+if placerboard.min_pitch() < 1.0:
+    drc_rules['mdPadVia'] = '2mm'
+else:
+    drc_rules['mdPadVia'] = '6mil'
+
+add_key_value_params(eagle.getDesignrules(), drc_rules)
+
+
+#Change to a 4 layer board, if specified
 if args.layers:
     route_names = {
         1:'Top',
