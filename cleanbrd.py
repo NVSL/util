@@ -154,11 +154,11 @@ drc_rules = {
 
 placerboard = PlacerBoard()
 placerboard.import_board(eagle)
-
-if placerboard.min_pitch() < 1.0:
-    drc_rules['mdPadVia'] = '2mm'
-else:
-    drc_rules['mdPadVia'] = '6mil'
+#
+# if placerboard.min_pitch() < 1.0:
+#     drc_rules['mdPadVia'] = '2mm'
+# else:
+#     drc_rules['mdPadVia'] = '6mil'
 
 add_key_value_params(eagle.getDesignrules(), drc_rules)
 
