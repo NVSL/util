@@ -12,9 +12,9 @@ from Rectangle import Rectangle
 # Mirrored stuff is still glitchy
 
 
-parser = argparse.ArgumentParser("Helps you prepare a board file for the board mill")
-parser.add_argument("-i", "--inbrd")
-parser.add_argument("-o", "--outbrd")
+parser = argparse.ArgumentParser(description="Helps you prepare a board file for the board mill")
+parser.add_argument("-i", "--inbrd", required=True)
+parser.add_argument("-o", "--outbrd", required=True)
 parser.add_argument("-r", "--rubouts", action="store_true",
                     help="Add rubouts around every pad that has a connection. Makes things easier to solder.")
 args = parser.parse_args()
