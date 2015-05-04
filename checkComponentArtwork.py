@@ -37,25 +37,27 @@ def check_artwork_against_package(svg_path, swoop_from_package):
     except ET.XMLSyntaxError:
         sys.stderr.write("Invalid SVG: {0}\n".format(svg_path))
         return False
+
+    we_are_ok = True
     mm_dim = re.compile(r"(\d+(\.\d+)?)mm")
     height =  float(re.match(mm_dim, svg.get("height")).group(1))
     width = float(re.match(mm_dim, svg.get("width")).group(1))
     if not close(width, rect.width, 2):
         sys.stderr.write("{0} has width {1}mm, but the package has width {2}mm\n".
                          format(svg_name, width, rect.width))
-        return False
+        we_are_ok=False
     if not close(height, rect.height, 2):
         sys.stderr.write("{0} has height {1}mm, but the package has height {2}mm\n".
                          format(svg_name, height, rect.height))
-        return False
+        we_are_ok=False
 
     top_left = np.array(map(float, svg.get("viewBox").split()[:2]))
     top_left[1] *= -1
-    if not np.allclose(top_left, rect.vertices().next(), atol=2.0):
+    if not np.allclose(top_left, rect.vertices().next(), atol=1.0):
         sys.stderr.write("{0} has its upper-left at {1}, the package has it at {2}\n".\
             format(svg_name, top_left, rect.vertices().next()))
-        return False
-    return True
+        we_are_ok=False
+    return we_are_ok
 
 
 
