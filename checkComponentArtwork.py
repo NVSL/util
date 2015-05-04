@@ -49,12 +49,12 @@ def check_artwork_against_package(svg_path, swoop_from_package):
                          format(svg_name, height, rect.height))
         return False
 
-    bottom_left = np.array(map(float, svg.get("viewBox").split()[:2]))
-    if not np.allclose(bottom_left, rect.bounds[0]):
-        sys.stderr.write("{0} has its lower-left at {1}, the package has it at {2}\n".\
-            format(svg_name, bottom_left, rect.bounds[0]))
+    top_left = np.array(map(float, svg.get("viewBox").split()[:2]))
+    top_left[1] *= -1
+    if not np.allclose(top_left, rect.vertices().next(), atol=2.0):
+        sys.stderr.write("{0} has its upper-left at {1}, the package has it at {2}\n".\
+            format(svg_name, top_left, rect.vertices().next()))
         return False
-
     return True
 
 
@@ -91,7 +91,6 @@ class LibraryCollectionLazy(object):
         if path_lib is None:
             return None
         if path_lib.library is None:
-            print "loading " + libname
             path_lib.library = SwoopGeom.from_file(path_lib.path).get_library()
         return path_lib.library
 
@@ -115,7 +114,12 @@ libraries = LibraryCollectionLazy(lib_dir)
 
 ARE_WE_GOOD = True
 
+good_components = 0
+num_components = 0
+
 for component in xml.findall("component"):
+    num_components += 1
+    component_ok = True
     device = component.find("eagledevice")
     package = None
     placed_parts = component.findall("placedparts/placedpart")
@@ -154,7 +158,8 @@ for component in xml.findall("component"):
             continue
 
         artwork_svg_file = join(catalog_dir, svg)
-        check_artwork_against_package(artwork_svg_file, package)
+        component_ok = component_ok and check_artwork_against_package(artwork_svg_file, package)
+        ARE_WE_GOOD = ARE_WE_GOOD and component_ok
 
 
     # Pull the package from the schematic
@@ -185,7 +190,17 @@ for component in xml.findall("component"):
                 # sys.stderr.write("Part {0} in {1} has no package\n".format(refdes, schematic_file))
                 continue
             artwork_svg_file = join(catalog_dir, placedpart.get("model2D"))
-            check_artwork_against_package(artwork_svg_file, package)
+            component_ok = component_ok and check_artwork_against_package(artwork_svg_file, package)
+            ARE_WE_GOOD = ARE_WE_GOOD and component_ok
+
+    if not component_ok:
+        pass
+        # sys.stderr.write("{0} is bugged\n".format(keyname))
+    else:
+        good_components += 1
+
+
+print "{0} good components out of {1}".format(good_components, num_components)
 
 if not ARE_WE_GOOD:
     sys.exit("Some components have errors")
