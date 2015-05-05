@@ -42,7 +42,7 @@ bRub.set_active("yes")
 board.add_layer(bRub)
 
 
-if args.rubouts:
+if args.rubouts or args.trestrict:
     for elem in board.get_elements():
         center = elem.get_point()
         package = elem.find_package()
@@ -68,7 +68,7 @@ if args.rubouts:
 
 
 
-board.write("out.brd")
+board.write(args.outbrd)
 
 
 
