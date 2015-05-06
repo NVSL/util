@@ -7,6 +7,7 @@ import argparse
 import sys
 import itertools
 from Rectangle import Rectangle
+from lxml import etree
 
 
 # Board mill script
@@ -22,9 +23,29 @@ parser.add_argument("-r", "--postroute", action="store_true",
 parser.add_argument("-t", "--preroute", action="store_true",
                     help="Run this before autorouting. Adds tRestrict to every pad with a connection so "
                          "the autorouter only puts traces on the bottom. ")
+parser.add_argument("-g", "--gspec", help="Gadgetron gspec file for automated options")
 args = parser.parse_args()
 
+if not (args.preroute or args.postroute):
+    sys.exit("Specify --preroute or --postroute")
+
 board = SwoopGeom.BoardFile(args.inbrd)
+
+if args.gspec is not None:
+    gspec_xml = etree.parse(args.gspec)
+    target = gspec_xml.getroot().get("target")
+    if target != "LPKF":
+        board.write(args.outbrd)
+        sys.exit(0)
+
+
+def find_signal_for_pad(board, elem, pad):
+    for signal in board.get_signals():
+        for cref in signal.get_contactrefs():
+            if cref.element == elem.name and cref.pad == pad.name:
+                return signal
+    return None
+
 
 tRub = Swoop.Layer()
 tRub.set_color(13)
@@ -43,17 +64,6 @@ bRub.set_name("bRubout")
 bRub.set_visible("yes")
 bRub.set_active("yes")
 board.add_layer(bRub)
-
-
-def find_signal_for_pad(board, elem, pad):
-    for signal in board.get_signals():
-        for cref in signal.get_contactrefs():
-            if cref.element == elem.name and cref.pad == pad.name:
-                return signal
-    return None
-
-if not (args.preroute or args.postroute):
-    sys.exit("Specify --preroute or --postroute")
 
 
 # Change DRC settings
@@ -95,18 +105,6 @@ for elem in board.get_elements():
                 board.draw_rect(restrict_box, 'tRestrict')
 
 
-
-
-
-
 board.write(args.outbrd)
-
-
-
-
-
-
-
-
 
 
