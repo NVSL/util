@@ -4,6 +4,8 @@
 import SwoopGeom
 import Swoop
 import argparse
+import sys
+import itertools
 from Rectangle import Rectangle
 
 
@@ -15,10 +17,11 @@ from Rectangle import Rectangle
 parser = argparse.ArgumentParser(description="Helps you prepare a board file for the board mill")
 parser.add_argument("-i", "--inbrd", required=True)
 parser.add_argument("-o", "--outbrd", required=True)
-parser.add_argument("-r", "--rubouts", action="store_true",
+parser.add_argument("-r", "--postroute", action="store_true",
                     help="Add rubouts around every pad that has a connection. Makes things easier to solder.")
-parser.add_argument("-t", "--trestrict", action="store_true",
-                    help="Add tRestrict to every pad with a connection so the autorouter only puts traces on the bottom")
+parser.add_argument("-t", "--preroute", action="store_true",
+                    help="Run this before autorouting. Adds tRestrict to every pad with a connection so "
+                         "the autorouter only puts traces on the bottom. ")
 args = parser.parse_args()
 
 board = SwoopGeom.BoardFile(args.inbrd)
@@ -42,28 +45,56 @@ bRub.set_active("yes")
 board.add_layer(bRub)
 
 
-if args.rubouts or args.trestrict:
-    for elem in board.get_elements():
-        center = elem.get_point()
-        package = elem.find_package()
-        for pad in elem.get_package_moved().get_pads():
-            #Check if pad is connected
-            if board.get_signals().get_contactrefs().\
-                    with_element(elem.get_name()).with_pad(pad.get_name()).count() > 0:
-                #Rubout box around pad
-                #Give 0.9mm of rubout space
-                rub_box = pad.get_bounding_box().pad(0.9)
-                rubout_layers = []
-                for overlap in board.get_overlapping(rub_box).with_type(Swoop.Wire):
-                    if overlap.get_layer()=='Top' and 'tRubout' not in rubout_layers:
-                        rubout_layers.append('tRubout')
-                    if overlap.get_layer()=='Bottom' and 'bRubout' not in rubout_layers:
-                        rubout_layers.append('bRubout')
-                for layer in rubout_layers:
-                    board.draw_rect(rub_box, layer)
-                if args.trestrict:
-                    restrict_box = pad.get_bounding_box().pad(0.9)
-                    board.draw_rect(restrict_box, 'tRestrict')
+def find_signal_for_pad(board, elem, pad):
+    for signal in board.get_signals():
+        for cref in signal.get_contactrefs():
+            if cref.element == elem.name and cref.pad == pad.name:
+                return signal
+    return None
+
+if not (args.preroute or args.postroute):
+    sys.exit("Specify --preroute or --postroute")
+
+
+# Change DRC settings
+stuff = ['Wire', 'Pad', 'Via']
+for s1,s2 in itertools.product(stuff, stuff):
+    param = board.get_designrules().get_param("md" + s1 + s2)
+    param.set_value("10mil")
+
+OTHER_DRC = {
+    'msDrill': "0.9mm",
+    'msWidth': "0.2mm"
+}
+
+for k,v in OTHER_DRC.items():
+    board.get_designrules().get_param(k).set_value(v)
+
+
+# Make tRestrict rectangles or rubouts
+for elem in board.get_elements():
+    center = elem.get_point()
+    package = elem.find_package()
+    for pad in elem.get_package_moved().get_pads():
+        #Check if pad is connected
+        signal = find_signal_for_pad(board, elem, pad)
+        if signal is not None and len(signal.get_contactrefs()) > 1:
+            #Rubout box around pad
+            #Give 0.9mm of rubout space
+            rub_box = pad.get_bounding_box().pad(0.9)
+            rubout_layers = []
+            for overlap in board.get_overlapping(rub_box).with_type(Swoop.Wire):
+                if overlap.get_layer()=='Top' and 'tRubout' not in rubout_layers:
+                    rubout_layers.append('tRubout')
+                if overlap.get_layer()=='Bottom' and 'bRubout' not in rubout_layers:
+                    rubout_layers.append('bRubout')
+            for layer in rubout_layers:
+                board.draw_rect(rub_box, layer)
+            if args.preroute:
+                restrict_box = pad.get_bounding_box().pad(0.9)
+                board.draw_rect(restrict_box, 'tRestrict')
+
+
 
 
 
