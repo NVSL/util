@@ -46,6 +46,23 @@ def find_signal_for_pad(board, elem, pad):
                 return signal
     return None
 
+# Place rubout around this element if there are traces nearby
+def rubout_maybe(board, element):
+    rub_box = element.get_bounding_box().pad(0.9)
+    rubout_layers = []
+    for overlap in board.get_overlapping(rub_box).with_type(Swoop.Wire):
+        if overlap.get_layer()=='Top' and 'tRubout' not in rubout_layers:
+            rubout_layers.append('tRubout')
+        if overlap.get_layer()=='Bottom' and 'bRubout' not in rubout_layers:
+            rubout_layers.append('bRubout')
+    for layer in rubout_layers:
+        board.draw_rect(rub_box, layer)
+
+
+def restrict_pad(board, pad):
+    restrict_box = pad.get_bounding_box().pad(0.9)
+    board.draw_rect(restrict_box, 'tRestrict')
+
 
 tRub = Swoop.Layer()
 tRub.set_color(13)
@@ -91,18 +108,15 @@ for elem in board.get_elements():
         if signal is not None and len(signal.get_contactrefs()) > 1:
             #Rubout box around pad
             #Give 0.9mm of rubout space
-            rub_box = pad.get_bounding_box().pad(0.9)
-            rubout_layers = []
-            for overlap in board.get_overlapping(rub_box).with_type(Swoop.Wire):
-                if overlap.get_layer()=='Top' and 'tRubout' not in rubout_layers:
-                    rubout_layers.append('tRubout')
-                if overlap.get_layer()=='Bottom' and 'bRubout' not in rubout_layers:
-                    rubout_layers.append('bRubout')
-            for layer in rubout_layers:
-                board.draw_rect(rub_box, layer)
+            if args.postroute:
+                rubout_maybe(board, pad)
             if args.preroute:
-                restrict_box = pad.get_bounding_box().pad(0.9)
-                board.draw_rect(restrict_box, 'tRestrict')
+                restrict_pad(board, pad)
+
+if args.postroute:
+    for via in board.get_signals().get_vias():
+        rubout_maybe(board, via)
+
 
 
 board.write(args.outbrd)
