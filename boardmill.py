@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 
-import Swoop.ext.Geometry as SwoopGeom
+
 import Swoop
 import argparse
 import sys
@@ -29,7 +29,7 @@ args = parser.parse_args()
 if not (args.preroute or args.postroute):
     sys.exit("Specify --preroute or --postroute")
 
-board = SwoopGeom.BoardFile(args.inbrd)
+board = Swoop.from_file(args.inbrd)
 
 if args.gspec is not None:
     gspec_xml = etree.parse(args.gspec)
@@ -38,6 +38,9 @@ if args.gspec is not None:
         board.write(args.outbrd)
         sys.exit(0)
 
+
+import Swoop.ext.Geometry as SwoopGeom
+board = SwoopGeom.BoardFile(args.inbrd)
 
 def find_signal_for_pad(board, elem, pad):
     for signal in board.get_signals():
