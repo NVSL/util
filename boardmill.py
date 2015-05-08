@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 
-import Swoop.ext.SwoopGeom
+import Swoop.ext.Geometry as SwoopGeom
 import Swoop
 import argparse
 import sys
@@ -29,7 +29,7 @@ args = parser.parse_args()
 if not (args.preroute or args.postroute):
     sys.exit("Specify --preroute or --postroute")
 
-board = Swoop.exe.SwoopGeom.BoardFile(args.inbrd)
+board = SwoopGeom.BoardFile(args.inbrd)
 
 if args.gspec is not None:
     gspec_xml = etree.parse(args.gspec)
