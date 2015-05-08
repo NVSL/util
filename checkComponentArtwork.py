@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import argparse
-import SwoopGeom
+import Swoop.ext.SwoopGeom
 import Swoop
 from lxml import etree as ET
 import os
@@ -93,7 +93,7 @@ class LibraryCollectionLazy(object):
         if path_lib is None:
             return None
         if path_lib.library is None:
-            path_lib.library = SwoopGeom.from_file(path_lib.path).get_library()
+            path_lib.library = Swoop.ext.SwoopGeom.from_file(path_lib.path).get_library()
         return path_lib.library
 
 
@@ -171,7 +171,7 @@ for component in xml.findall("component"):
         schematic_file = join(dir, component.find("schematic").get("filename"))
         if not os.path.isfile(schematic_file):
             sys.exit(keyname)
-        schematic = SwoopGeom.from_file(schematic_file)
+        schematic = Swoop.ext.SwoopGeom.from_file(schematic_file)
 
         for placedpart in placed_parts:
             refdes = placedpart.get("refdes")
