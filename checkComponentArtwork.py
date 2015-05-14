@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import argparse
-import Swoop.ext.SwoopGeom
+import Swoop.ext.Geometry as SwoopGeom
 import Swoop
 from lxml import etree as ET
 import os
@@ -18,7 +18,7 @@ def missing_tag(name, bad_tag, missing_attr):
                      format(name, bad_tag.tag, missing_attr))
 
 
-def check_artwork_against_package(svg_path, swoop_from_package):
+def check_artwork_against_package(svg_path, swoop_from_package, tolerance = 5.0):
     def close(val1, val2, atol = 0.5):
          # Custom compare with tolerance
         return abs(val1 - val2) <= atol
@@ -40,22 +40,33 @@ def check_artwork_against_package(svg_path, swoop_from_package):
 
     we_are_ok = True
     mm_dim = re.compile(r"(\d+(\.\d+)?)mm")
-    height =  float(re.match(mm_dim, svg.get("height")).group(1))
-    width = float(re.match(mm_dim, svg.get("width")).group(1))
-    if not close(width, rect.width, 2):
+    match = re.match(mm_dim, svg.get("height"))
+    if match is None:
+        sys.stderr.write("{0} has an invalid height: {1}\n".format(svg_name, svg.get("height")))
+        return False
+    height =  float(match.group(1))
+
+    match = re.match(mm_dim, svg.get("width"))
+    if match is None:
+        sys.stderr.write("{0} has an invalid width: {1}\n".format(svg_name, svg.get("width")))
+        return False
+    width = float(match.group(1))
+    if not close(width, rect.width, tolerance):
         sys.stderr.write("{0} has width {1}mm, but the package has width {2}mm\n".
                          format(svg_name, width, rect.width))
         we_are_ok=False
-    if not close(height, rect.height, 2):
+    if not close(height, rect.height, tolerance):
         sys.stderr.write("{0} has height {1}mm, but the package has height {2}mm\n".
                          format(svg_name, height, rect.height))
         we_are_ok=False
 
     top_left = np.array(map(float, svg.get("viewBox").split()[:2]))
     top_left[1] *= -1
-    if not np.allclose(top_left, rect.vertices().next(), atol=1.0):
-        sys.stderr.write("{0} has its upper-left at {1}, the package has it at {2}\n".\
-            format(svg_name, top_left, rect.vertices().next()))
+    bottom_left = top_left
+    bottom_left[1] -= height
+    if not np.allclose(bottom_left, rect.bounds[0], atol=tolerance):
+        sys.stderr.write("{0} has its lower-left at {1}, the package has it at {2}\n".\
+            format(svg_name, top_left, rect.bounds[0]))
         we_are_ok=False
     return we_are_ok
 
@@ -93,7 +104,7 @@ class LibraryCollectionLazy(object):
         if path_lib is None:
             return None
         if path_lib.library is None:
-            path_lib.library = Swoop.ext.SwoopGeom.from_file(path_lib.path).get_library()
+            path_lib.library = SwoopGeom.from_file(path_lib.path).get_library()
         return path_lib.library
 
 
@@ -171,7 +182,7 @@ for component in xml.findall("component"):
         schematic_file = join(dir, component.find("schematic").get("filename"))
         if not os.path.isfile(schematic_file):
             sys.exit(keyname)
-        schematic = Swoop.ext.SwoopGeom.from_file(schematic_file)
+        schematic = SwoopGeom.from_file(schematic_file)
 
         for placedpart in placed_parts:
             refdes = placedpart.get("refdes")
