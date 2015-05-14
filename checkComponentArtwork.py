@@ -18,14 +18,44 @@ def missing_tag(name, bad_tag, missing_attr):
                      format(name, bad_tag.tag, missing_attr))
 
 
-def check_artwork_against_package(svg_path, swoop_from_package, tolerance = 5.0):
+def check_artwork_against_package(svg_path,
+                                  swoop_from_package,
+                                  placed_part_tag,
+                                  tolerance = 5.0):
+    """
+    Do the SVG dimensions match the eagle package?
+
+    """
+
     def close(val1, val2, atol = 0.5):
          # Custom compare with tolerance
         return abs(val1 - val2) <= atol
 
+    # Get height/width attributes
+    def get_svg_dim(svg, attr):
+        match = re.match(r"(\d+(\.\d+)?)mm", svg.get(attr))
+        if match is None:
+            sys.stderr.write("{0} has an invalid {1}: {2}\n".format(svg_name, attr, svg.get(attr)))
+            return False
+        return float(match.group(1))
+
+    def compare_dims(name, svg_dim, package_dim, override=None):
+        if override is not None:
+            if not close(svg_dim, override, tolerance):
+                sys.stderr.write("{svg} has {dim} {sd}mm, but the gcom file says {o}mm\n".
+                             format(svg=svg_name, dim=name, sd=svg_dim, o=override))
+                return False
+        else:
+            if not close(svg_dim, package_dim, tolerance):
+                sys.stderr.write("{svg} has {dim} {sd}mm, but the package has {dim} {pd}mm\n".
+                             format(svg=svg_name, dim=name, sd=svg_dim, pd=package_dim))
+                return False
+        return True
+
     assert isinstance(swoop_from_package, Swoop.From)
     assert len(swoop_from_package)==1
     assert isinstance(swoop_from_package[0], Swoop.Package)
+
     boxes = package.get_children().get_bounding_box()
     if len(boxes)==0:
         sys.stderr.write("Package {0} has no bounding box\n".format(swoop_from_package[0].get_name()))
@@ -38,37 +68,40 @@ def check_artwork_against_package(svg_path, swoop_from_package, tolerance = 5.0)
         sys.stderr.write("Invalid SVG: {0}\n".format(svg_path))
         return False
 
-    we_are_ok = True
-    mm_dim = re.compile(r"(\d+(\.\d+)?)mm")
-    match = re.match(mm_dim, svg.get("height"))
-    if match is None:
-        sys.stderr.write("{0} has an invalid height: {1}\n".format(svg_name, svg.get("height")))
-        return False
-    height =  float(match.group(1))
+    package_art_height=None
+    package_art_width=None
+    package_art_minxy=None
+    if placed_part_tag.get("art-height"):
+        package_art_height=float(placed_part_tag.get("art-height"))
+    if placed_part_tag.get("art-width"):
+        package_art_width=float(placed_part_tag.get("art-width"))
+    if placed_part_tag.get("art-minxy"):
+        package_art_minxy=np.array(map(float, placed_part_tag.get("art-minxy").split()))
 
-    match = re.match(mm_dim, svg.get("width"))
-    if match is None:
-        sys.stderr.write("{0} has an invalid width: {1}\n".format(svg_name, svg.get("width")))
-        return False
-    width = float(match.group(1))
-    if not close(width, rect.width, tolerance):
-        sys.stderr.write("{0} has width {1}mm, but the package has width {2}mm\n".
-                         format(svg_name, width, rect.width))
-        we_are_ok=False
-    if not close(height, rect.height, tolerance):
-        sys.stderr.write("{0} has height {1}mm, but the package has height {2}mm\n".
-                         format(svg_name, height, rect.height))
-        we_are_ok=False
+    svg_ok = True
+    svg_height = get_svg_dim(svg, "height")
+    svg_width = get_svg_dim(svg, "width")
 
-    top_left = np.array(map(float, svg.get("viewBox").split()[:2]))
-    top_left[1] *= -1
-    bottom_left = top_left
-    bottom_left[1] -= height
-    if not np.allclose(bottom_left, rect.bounds[0], atol=tolerance):
-        sys.stderr.write("{0} has its lower-left at {1}, the package has it at {2}\n".\
-            format(svg_name, top_left, rect.bounds[0]))
-        we_are_ok=False
-    return we_are_ok
+    if svg_width is None or svg_height is None:
+        return False
+
+    svg_ok = svg_ok and compare_dims("height", svg_height, rect.height, package_art_height)
+    svg_ok = svg_ok and compare_dims("width", svg_width, rect.width, package_art_width)
+
+    bottom_left = np.array(map(float, svg.get("viewBox").split()[:2]))
+    bottom_left[1] *= -1
+    bottom_left[1] -= svg_height
+    if package_art_minxy is not None:
+        if not np.allclose(bottom_left, package_art_minxy, atol=tolerance):
+            sys.stderr.write("{0} has its lower-left at {1}, the gcom file says {2}\n".\
+                format(svg_name, bottom_left, rect.bounds[0]))
+            svg_ok=False
+    else:
+        if not np.allclose(bottom_left, rect.bounds[0], atol=tolerance):
+            sys.stderr.write("{0} has its lower-left at {1}, the package has it at {2}\n".\
+                format(svg_name, bottom_left, rect.bounds[0]))
+            svg_ok=False
+    return svg_ok
 
 
 
@@ -171,7 +204,7 @@ for component in xml.findall("component"):
             continue
 
         artwork_svg_file = join(catalog_dir, svg)
-        component_ok = component_ok and check_artwork_against_package(artwork_svg_file, package)
+        component_ok = component_ok and check_artwork_against_package(artwork_svg_file, package, placed_parts[0])
         ARE_WE_GOOD = ARE_WE_GOOD and component_ok
 
 
@@ -203,7 +236,7 @@ for component in xml.findall("component"):
                 # sys.stderr.write("Part {0} in {1} has no package\n".format(refdes, schematic_file))
                 continue
             artwork_svg_file = join(catalog_dir, placedpart.get("model2D"))
-            component_ok = component_ok and check_artwork_against_package(artwork_svg_file, package)
+            component_ok = component_ok and check_artwork_against_package(artwork_svg_file, package, placedpart)
             ARE_WE_GOOD = ARE_WE_GOOD and component_ok
 
     if not component_ok:
