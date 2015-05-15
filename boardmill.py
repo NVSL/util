@@ -22,7 +22,8 @@ parser.add_argument("-r", "--postroute", action="store_true",
                     help="Add rubouts around every pad that has a connection. Makes things easier to solder.")
 parser.add_argument("-t", "--preroute", action="store_true",
                     help="Run this before autorouting. Adds tRestrict to every pad with a connection so "
-                         "the autorouter only puts traces on the bottom. ")
+                         "the autorouter only puts traces on the bottom. Also puts vRestrict on every part"
+                         "so you don't have vias underneath things. ")
 parser.add_argument("-g", "--gspec", help="Gadgetron gspec file for automated options")
 args = parser.parse_args()
 
@@ -103,8 +104,11 @@ for k,v in OTHER_DRC.items():
 
 # Make tRestrict rectangles or rubouts
 for elem in board.get_elements():
-    center = elem.get_point()
-    package = elem.find_package()
+    if args.preroute:
+        bbox = elem.get_package_moved().get_bounding_box()
+        assert bbox is not None
+        board.draw_rect(bbox, 'vRestrict')
+
     for pad in elem.get_package_moved().get_pads():
         #Check if pad is connected
         signal = find_signal_for_pad(board, elem, pad)
