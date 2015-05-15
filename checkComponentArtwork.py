@@ -85,8 +85,11 @@ def check_artwork_against_package(svg_path,
     if svg_width is None or svg_height is None:
         return False
 
-    svg_ok = svg_ok and compare_dims("height", svg_height, rect.height, package_art_height)
-    svg_ok = svg_ok and compare_dims("width", svg_width, rect.width, package_art_width)
+    if not compare_dims("height", svg_height, rect.height, package_art_height):
+        svg_ok = False
+    if not compare_dims("width", svg_width, rect.width, package_art_width):
+        svg_ok = False
+
 
     bottom_left = np.array(map(float, svg.get("viewBox").split()[:2]))
     bottom_left[1] *= -1
