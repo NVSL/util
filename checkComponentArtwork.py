@@ -21,7 +21,7 @@ def missing_tag(name, bad_tag, missing_attr):
 def check_artwork_against_package(svg_path,
                                   swoop_from_package,
                                   placed_part_tag,
-                                  tolerance = 1.0):
+                                  tolerance = 2.0):
     """
     Do the SVG dimensions match the eagle package?
 
