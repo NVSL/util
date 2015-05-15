@@ -233,7 +233,8 @@ for component in xml.findall("component"):
                                  format(placedpart.get("refdes"),keyname,schematic_file))
                 ARE_WE_GOOD=False
                 continue
-            package = part.find_package()
+
+            package = get_package(libraries, part.get_library()[0], part.get_deviceset()[0], part.get_device()[0])
             if len(package)==0:
                 #TODO: probably a koala part
                 # sys.stderr.write("Part {0} in {1} has no package\n".format(refdes, schematic_file))
