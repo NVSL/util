@@ -21,7 +21,7 @@ def missing_tag(name, bad_tag, missing_attr):
 def check_artwork_against_package(svg_path,
                                   swoop_from_package,
                                   placed_part_tag,
-                                  tolerance = 2.0):
+                                  tolerance = 1.0):
     """
     Do the SVG dimensions match the eagle package?
 
@@ -107,8 +107,6 @@ def check_artwork_against_package(svg_path,
     return svg_ok
 
 
-
-
 def get_package(all_libraries, libname, device_name, variant):
     lib = libraries.get(libname)
     if lib is None:
@@ -175,14 +173,16 @@ for component in xml.findall("component"):
     keyname = component.get("keyname")
     artwork_svg_file = None
     if component.find("schematic") is None:
-        print keyname + " has no schematic"
+        sys.stderr.write(keyname + " has no schematic\n")
 
     if len(placed_parts)==0:
-        sys.stderr.write("{0} has no placedparts section".format(keyname))
+        sys.stderr.write("{0} has no placedparts section\n".format(keyname))
         ARE_WE_GOOD=False
         continue
 
+    has_eagle_device = False
     if device is not None and len(placed_parts)==1:
+        has_eagle_device = True
         # Check from the <eagledevice> tag
         # Only one artwork file means we know which it is
         device_name = device.get("device-name")
@@ -191,6 +191,9 @@ for component in xml.findall("component"):
             ARE_WE_GOOD = False
         libname = device.get("library")
         if libname=="NONE":
+            good_components += 1
+            # No eagle device, probably art of some kind
+            # sys.stderr.write(keyname + " has library NONE\n")
             continue
         variant = device.get("variant")
         package = get_package(libraries, libname, device_name, variant)
@@ -214,6 +217,7 @@ for component in xml.findall("component"):
     # Pull the package from the schematic
     # Either there is no <eagledevice> or there are multiple artwork files
     if component.find("schematic") is not None:
+        has_eagle_device=True
         dir = join(components_dir, "Catalog", component.find("homedirectory").text)
         schematic_file = join(dir, component.find("schematic").get("filename"))
         if not os.path.isfile(schematic_file):
@@ -243,9 +247,12 @@ for component in xml.findall("component"):
             component_ok = component_ok and check_artwork_against_package(artwork_svg_file, package, placedpart)
             ARE_WE_GOOD = ARE_WE_GOOD and component_ok
 
+    if not has_eagle_device:
+        sys.stderr.write("{0} has no Eagle device. No <eagledevice> or schematic specified\n".format(keyname))
+
     if not component_ok:
         pass
-        # sys.stderr.write("{0} is bugged\n".format(keyname))
+        sys.stderr.write("{0} is bugged\n".format(keyname))
     else:
         good_components += 1
 
