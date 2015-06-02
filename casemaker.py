@@ -5,6 +5,7 @@ import Swoop.ext.Geometry as SwoopGeom
 import Swoop
 from solid import *
 import numpy as np
+from Rectangle import Rectangle
 
 def rect2scad(rect, height, z_start = 0):
     """
@@ -27,9 +28,7 @@ def make_cutout_rect(container, rect, thickness):
         if rect.low(axis) < container.low(axis):    #left/bottom cut
             move = np.array([0,0])
             move[axis] = -thickness*2
-            if cut is not None:
             cut = Rectangle.union(cut, rect.copy().move(move))
-            cut = rect.copy().move(move)
             # print cut
         if rect.high(axis) > container.high(axis):  #right/top cut
             move = np.array([0,0])
@@ -61,7 +60,7 @@ outer_shell = minkowski()(inner, sphere(thickness))
 
 case = outer_shell - inner
 
-tfaceplate_filter = lambda p: hasattr(p,"layer") and p.layer=="tFaceplate"
+tfaceplate_filter = lambda p: hasattr(p,"layer") and p.get_layer()=="tFaceplate"
 
 #Subtract out all the top faceplate stuff
 tfaceplate = board.get_elements().\
@@ -70,14 +69,16 @@ tfaceplate = board.get_elements().\
     filtered_by(tfaceplate_filter).\
     get_bounding_box()
 
+
 tfaceplate += board.get_plain_elements().filtered_by(tfaceplate_filter).get_bounding_box()
+
 
 for rect in tfaceplate:
     case -= rect2scad(rect,SPACE + 30) #top
     container = rect.copy().pad(1.0)
     if not board_box.encloses(container):  #faceplate sticks out the side
         # print "side cut {0}".format(rect.eagle_code())
-        cut = make_cutout_rect(board, container, thickness)
+        cut = make_cutout_rect(board_box, container, thickness)
         if cut is not None:
             case -= rect2scad(cut, SPACE)
 
