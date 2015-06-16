@@ -8,12 +8,12 @@ from Rectangle import Rectangle
 import sys
 import math
 
-def make_wire(v1,v2,layer):
+def make_wire(v1, v2, layer="Dimension", width=0.0):
     wire = SG.WithMixin.class_map["wire"]()
     wire.set_point(v1,0)
     wire.set_point(v2,1)
     wire.set_layer(layer)
-    wire.set_width(0.0)
+    wire.set_width(width)
     return wire
 
 parser = argparse.ArgumentParser(description="Panelize your Eagle boards")
@@ -27,6 +27,9 @@ parser.add_argument("-f","--fit",type=float,
                     help="Automatically set the rows and columns so the total area is no bigger than this (in mm^2)")
 parser.add_argument("-m","--min-aspect",type=float,default=0.1,
                     help="Minimum aspect ratio when fitting to avoid crazy shapes")
+parser.add_argument("-u","--cutout",action="store_true",
+                    help="Add line segments in the dimension layer indicating where the mill should make"
+                         " cuts to depanelize")
 args = parser.parse_args()
 
 if args.fit is None and args.rows is None and args.columns is None:
@@ -107,8 +110,25 @@ width = columns*board_box.width + (columns-1)*args.spacing
 height = rows*board_box.height + (rows-1)*args.spacing
 new_box = Rectangle(board_box.bounds[0], size=(width, height))
 verts = list(new_box.vertices())
-for i in xrange(4):
-    output.add_plain_element(make_wire(verts[i], verts[(i+1)%4], "Dimension"))
+
+TAB_GAP = 1.5
+if args.cutout:
+    for i in xrange(rows):
+        for j in xrange(columns):
+            offset = np.array([x_move*j, y_move*i])
+            tab_box = board_box.copy().move(offset)
+            verts = list(tab_box.vertices())
+            if i < rows - 1:
+                horiz = make_wire(verts[0] + np.array([TAB_GAP, args.spacing/2.0]),
+                          verts[1] + np.array([-TAB_GAP, args.spacing/2.0]))
+                output.add_plain_element(horiz)
+            if j < columns - 1:
+                vertical = make_wire(verts[2] + np.array([args.spacing/2.0, TAB_GAP]),
+                                     verts[1] + np.array([args.spacing/2.0, -TAB_GAP]))
+                output.add_plain_element(vertical)
+else:
+    for i in xrange(4):
+        output.add_plain_element(make_wire(verts[i], verts[(i+1)%4]))
 
 
 output.write(args.outfile)
