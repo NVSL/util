@@ -16,6 +16,13 @@ def make_wire(v1, v2, layer="Dimension", width=0.0):
     wire.set_width(width)
     return wire
 
+def make_drill(v, drill):
+    hole = SG.WithMixin.class_map["hole"]()
+    hole.set_point(v)
+    hole.set_drill(drill)
+    return hole
+
+
 parser = argparse.ArgumentParser(description="Panelize your Eagle boards")
 parser.add_argument("brdfile",help="Board file to panelize")
 parser.add_argument("outfile",help="Name of output file")
@@ -28,8 +35,9 @@ parser.add_argument("-f","--fit",type=float,
 parser.add_argument("-m","--min-aspect",type=float,default=0.1,
                     help="Minimum aspect ratio when fitting to avoid crazy shapes")
 parser.add_argument("-u","--cutout",action="store_true",
-                    help="Add line segments in the dimension layer indicating where the mill should make"
-                         " cuts to depanelize")
+                    help="Depanelize information. Everything in the dimension layer indicates where to cut. ")
+parser.add_argument("-t","--tab-size", default=1.5, type=float,
+                    help="The size of the tabs that you have to cut out after the milling process.")
 args = parser.parse_args()
 
 if args.fit is None and args.rows is None and args.columns is None:
@@ -106,31 +114,49 @@ for i in xrange(rows):
                     child.set_element("{0}PANELIZED{1}{2}".format(child.get_element(),i,j))
             output.add_signal(moved_sig)
 
+TAB_GAP = args.tab_size
+DRILL = 1.0
+
+for i in xrange(rows):
+    for j in xrange(columns):
+        offset = np.array([x_move*j, y_move*i])
+        tab_box = board_box.copy().move(offset)
+        verts = list(tab_box.vertices())
+        if i < rows - 1:
+            v1 = verts[0] + np.array([TAB_GAP/2.0, args.spacing/2.0])   #left
+            v2 = verts[1] + np.array([-TAB_GAP/2.0, args.spacing/2.0])  #right
+            if j==0:
+                v1[0] += TAB_GAP/2.0
+            if j==columns-1:
+                v2[0] -= TAB_GAP/2.0
+            if args.cutout:
+                horiz = make_wire(v1, v2, width=DRILL)
+                output.add_plain_element(horiz)
+            else:
+                output.add_plain_element(make_drill(v1, DRILL))
+                output.add_plain_element(make_drill(v2, DRILL))
+        if j < columns - 1:
+            v1 = verts[2] + np.array([args.spacing/2.0, TAB_GAP/2.0])   #lower
+            v2 = verts[1] + np.array([args.spacing/2.0, -TAB_GAP/2.0])  #upper
+            if i==0:
+                v1[1] += TAB_GAP/2.0    #full distance to edge
+            if i==rows-1:
+                v2[1] -= TAB_GAP/2.0
+            if args.cutout:
+                vertical = make_wire(v1, v2, width=DRILL)
+                output.add_plain_element(vertical)
+            else:
+                output.add_plain_element(make_drill(v1, DRILL))
+                output.add_plain_element(make_drill(v2, DRILL))
+
 width = columns*board_box.width + (columns-1)*args.spacing
 height = rows*board_box.height + (rows-1)*args.spacing
 new_box = Rectangle(board_box.bounds[0], size=(width, height))
 verts = list(new_box.vertices())
-
-TAB_GAP = 1.5
-if args.cutout:
-    for i in xrange(rows):
-        for j in xrange(columns):
-            offset = np.array([x_move*j, y_move*i])
-            tab_box = board_box.copy().move(offset)
-            verts = list(tab_box.vertices())
-            if i < rows - 1:
-                horiz = make_wire(verts[0] + np.array([TAB_GAP, args.spacing/2.0]),
-                          verts[1] + np.array([-TAB_GAP, args.spacing/2.0]))
-                output.add_plain_element(horiz)
-            if j < columns - 1:
-                vertical = make_wire(verts[2] + np.array([args.spacing/2.0, TAB_GAP]),
-                                     verts[1] + np.array([args.spacing/2.0, -TAB_GAP]))
-                output.add_plain_element(vertical)
-else:
+if not args.cutout:
     for i in xrange(4):
         output.add_plain_element(make_wire(verts[i], verts[(i+1)%4]))
 
 
 output.write(args.outfile)
-
 
