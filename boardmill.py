@@ -8,7 +8,7 @@ import sys
 import itertools
 from Rectangle import Rectangle
 from lxml import etree
-
+import logging as log
 
 # Board mill script
 # Right now it just draws rubouts around connected pads
@@ -34,11 +34,15 @@ board = Swoop.from_file(args.inbrd)
 
 if args.gspec is not None:
     gspec_xml = etree.parse(args.gspec)
-    target = gspec_xml.getroot().get("target")
-    if target != "LPKF":
-        board.write(args.outbrd)
-        sys.exit(0)
-
+    for i in gspec_xml.getroot().findall("option"):
+        if i.get("name") == "cam-target":
+            if i.get("value")  == "LPKF":
+                log.info("Processing design for board mill")
+                pass
+            else:
+                log.info("Skipping board bill processing")
+                board.write(args.outbrd)
+                sys.exit(0)
 
 import Swoop.ext.Geometry as SwoopGeom
 board = SwoopGeom.BoardFile(args.inbrd)
