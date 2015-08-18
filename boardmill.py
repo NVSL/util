@@ -19,11 +19,13 @@ parser = argparse.ArgumentParser(description="Helps you prepare a board file for
 parser.add_argument("-i", "--inbrd", required=True)
 parser.add_argument("-o", "--outbrd", required=True)
 parser.add_argument("-r", "--postroute", action="store_true",
-                    help="Add rubouts around every pad that has a connection. Makes things easier to solder.")
+                    help="Run after routing. Add rubouts around every pad that has a connection. Makes things easier to solder.")
+parser.add_argument("-p", "--padding", required=False, type=float, default=0.9,
+                    help="Amount of space (mm) to put around every pad when adding rubouts. Default is 0.9mm")
 parser.add_argument("-t", "--preroute", action="store_true",
                     help="Run this before autorouting. Adds tRestrict to every pad with a connection so "
                          "the autorouter only puts traces on the bottom. Also puts vRestrict on every part"
-                         "so you don't have vias underneath things. ")
+                         " so you don't have vias underneath things. ")
 parser.add_argument("-g", "--gspec", help="Gadgetron gspec file for automated options")
 args = parser.parse_args()
 
@@ -55,8 +57,8 @@ def find_signal_for_pad(board, elem, pad):
     return None
 
 # Place rubout around this element if there are traces nearby
-def rubout_maybe(board, element):
-    rub_box = element.get_bounding_box().pad(0.9)
+def rubout_maybe(board, element, padding):
+    rub_box = element.get_bounding_box().pad(padding)
     rubout_layers = []
     for overlap in board.get_overlapping(rub_box).with_type(Swoop.Wire):
         if overlap.get_layer()=='Top' and 'tRubout' not in rubout_layers:
@@ -99,7 +101,7 @@ for s1,s2 in itertools.product(stuff, stuff):
 
 OTHER_DRC = {
     'msDrill': "0.9mm",
-    'msWidth': "0.2mm"
+    'msWidth': "0.8mm"
 }
 
 for k,v in OTHER_DRC.items():
@@ -120,13 +122,14 @@ for elem in board.get_elements():
             #Rubout box around pad
             #Give 0.9mm of rubout space
             if args.postroute:
-                rubout_maybe(board, pad)
+                rubout_maybe(board, pad, args.padding)
             if args.preroute:
                 restrict_pad(board, pad)
 
+#Add rubouts for vias
 if args.postroute:
     for via in board.get_signals().get_vias():
-        rubout_maybe(board, via)
+        rubout_maybe(board, via, args.padding)
 
 
 
