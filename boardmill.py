@@ -28,6 +28,8 @@ parser.add_argument("-t", "--preroute", action="store_true",
                          " so you don't have vias underneath things. ")
 parser.add_argument("-n","--no-restrict",action="store_true",
                     help="Don't add any tRestrict so you can solder both sides")
+parser.add_argument("-nv","--no-vrestrict",action="store_true",
+                    help="Don't add any vRestrict. Vias will go absolutely anywhere.")
 parser.add_argument("-g", "--gspec", help="Gadgetron gspec file for automated options")
 args = parser.parse_args()
 
@@ -142,7 +144,7 @@ for apass in board.get_autorouter_passes():
 
 # Make tRestrict rectangles or rubouts
 for elem in board.get_elements():
-    if args.preroute:
+    if args.preroute and not args.no_vrestrict:
         bbox = elem.get_package_moved().get_bounding_box()
         assert bbox is not None
         board.draw_rect(bbox, 'vRestrict')
