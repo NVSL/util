@@ -26,6 +26,8 @@ parser.add_argument("-t", "--preroute", action="store_true",
                     help="Run this before autorouting. Adds tRestrict to every pad with a connection so "
                          "the autorouter only puts traces on the bottom. Also puts vRestrict on every part"
                          " so you don't have vias underneath things. ")
+parser.add_argument("-n","--no-restrict",action="store_true",
+                    help="Don't add any tRestrict so you can solder both sides")
 parser.add_argument("-g", "--gspec", help="Gadgetron gspec file for automated options")
 args = parser.parse_args()
 
@@ -101,11 +103,41 @@ for s1,s2 in itertools.product(stuff, stuff):
 
 OTHER_DRC = {
     'msDrill': "0.9mm",
-    'msWidth': "0.8mm"
+    'msWidth': "0.6mm",
+    'mdWireVia':'20mil',
+    'mdPadVia':'20mil',
+    'mdViaVia':'20mil',
+    'mdWireWire':'15mil',
+    'mdWirePad':'20mil'
 }
 
 for k,v in OTHER_DRC.items():
     board.get_designrules().get_param(k).set_value(v)
+
+
+AUTOROUTER = {
+    'cfVia' : '99',
+    'mnRipupLevel' : '50',
+    'mnRipupSteps':'500',
+    'mnRipupTotal':'500',
+    'tpViaShape':'round',
+    'PrefDir.16':'a',
+    'PrefDir.1':'a',
+    'TopRouterVariant':'1',
+    'Efforts':'2',
+    'RoutingGrid':'25mil'
+}
+
+
+
+for apass in board.get_autorouter_passes():
+    for param in apass.get_params():
+        if param.get_name() in AUTOROUTER:
+            param.set_value(AUTOROUTER[param.get_name()])
+
+        # print apass.get_param(k).value
+        # if apass.get_param(k) is not None:
+        #     apass.get_param(k).set_value(v)
 
 
 # Make tRestrict rectangles or rubouts
@@ -123,7 +155,7 @@ for elem in board.get_elements():
             #Give 0.9mm of rubout space
             if args.postroute:
                 rubout_maybe(board, pad, args.padding)
-            if args.preroute:
+            if args.preroute and not args.no_restrict:
                 restrict_pad(board, pad)
 
 #Add rubouts for vias
