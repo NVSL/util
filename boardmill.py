@@ -20,6 +20,8 @@ parser.add_argument("-i", "--inbrd", required=True)
 parser.add_argument("-o", "--outbrd", required=True)
 parser.add_argument("-r", "--postroute", action="store_true",
                     help="Run after routing. Add rubouts around every pad that has a connection. Makes things easier to solder.")
+parser.add_argument("-rv","--rivets", action="store_true",
+                    help="Use rivets to make vias. This changes the drill diameter of everything to the next largest rivet")
 parser.add_argument("-p", "--padding", required=False, type=float, default=0.9,
                     help="Amount of space (mm) to put around every pad when adding rubouts. Default is 0.9mm")
 parser.add_argument("-t", "--preroute", action="store_true",
@@ -44,7 +46,6 @@ if args.gspec is not None:
         if i.get("name") == "cam-target":
             if i.get("value")  == "LPKF":
                 log.info("Processing design for board mill")
-                pass
             else:
                 log.info("Skipping board bill processing")
                 board.write(args.outbrd)
@@ -60,6 +61,12 @@ def find_signal_for_pad(board, elem, pad):
                 return signal
     return None
 
+def is_pad_connected(board, elem, pad):
+    signal = find_signal_for_pad(board, elem, pad)
+    if signal is not None and len(signal.get_contactrefs()) > 1:
+        return True
+    return False
+
 # Place rubout around this element if there are traces nearby
 def rubout_maybe(board, element, padding):
     rub_box = element.get_bounding_box().pad(padding)
@@ -69,13 +76,41 @@ def rubout_maybe(board, element, padding):
             rubout_layers.append('tRubout')
         if overlap.get_layer()=='Bottom' and 'bRubout' not in rubout_layers:
             rubout_layers.append('bRubout')
+
+    radius = max(rub_box.width, rub_box.height) / 2.0
     for layer in rubout_layers:
-        board.draw_rect(rub_box, layer)
+        board.draw_circle(center=rub_box.center(), radius=radius, layer=layer, width=0.001)
 
 
 def restrict_pad(board, pad):
     restrict_box = pad.get_bounding_box().pad(0.9)
     board.draw_rect(restrict_box, 'tRestrict')
+
+
+# Inner diameter of rivets (mm). The drill size to accommodate must be 0.3mm more
+# Must be in ascending order
+RIVET_SIZES = [0.6, 0.8, 1.0, 1.2]
+
+# If the rivet is just slightly too small (within this tolerance) it may still work
+RIVET_TOLERANCE = 0.020
+RIVET_DRILLS = map(lambda r: r+0.3, RIVET_SIZES)
+RIVET_DRILLS[2] += 0.030        # Long end mill is not very accurate in widening the hole
+
+def fix_drill_for_rivet(pad_or_via):
+    # Change the drill size of the pad
+    new_drill = None
+
+    # Find the next largest rivet for the pad
+    # Allow for some tolerance wiggle room
+    for rivet in RIVET_SIZES:
+        if rivet + RIVET_TOLERANCE >= pad_or_via.get_drill():
+            new_drill = rivet + 0.3
+            break
+    if new_drill is None:
+        sys.stderr.write("Cannot use a rivet for pad/via at location {0}. Its drill diameter ({1}mm) is too large\n".
+                         format(pad_or_via.get_point(), pad_or_via.get_drill()))
+    else:
+        pad_or_via.set_drill(new_drill)
 
 
 tRub = Swoop.Layer()
@@ -98,19 +133,23 @@ board.add_layer(bRub)
 
 
 # Change DRC settings
+
+# Default all DRC settings to 10mil first
 stuff = ['Wire', 'Pad', 'Via']
 for s1,s2 in itertools.product(stuff, stuff):
     param = board.get_designrules().get_param("md" + s1 + s2)
     param.set_value("10mil")
 
+# And here you can tweak each parameter individually
 OTHER_DRC = {
-    'msDrill': "0.9mm",
+    'msDrill': "0.9mm",  # the smallest a via can be
     'msWidth': "0.6mm",
     'mdWireVia':'20mil',
-    'mdPadVia':'20mil',
-    'mdViaVia':'20mil',
+    'mdPadVia':'0.35mm',
+    'mdPadPad':'0.35mm',
+    'mdViaVia':'0.35mm',
     'mdWireWire':'15mil',
-    'mdWirePad':'20mil'
+    'mdWirePad':'0.35mm'
 }
 
 for k,v in OTHER_DRC.items():
@@ -132,6 +171,7 @@ AUTOROUTER = {
 
 
 
+
 for apass in board.get_autorouter_passes():
     for param in apass.get_params():
         if param.get_name() in AUTOROUTER:
@@ -142,6 +182,9 @@ for apass in board.get_autorouter_passes():
         #     apass.get_param(k).set_value(v)
 
 
+vias = []   # All vias
+pads_moved = []   # Connected pads in package_moved (a clone)
+
 # Make tRestrict rectangles or rubouts
 for elem in board.get_elements():
     if args.preroute and not args.no_vrestrict:
@@ -151,20 +194,34 @@ for elem in board.get_elements():
 
     for pad in elem.get_package_moved().get_pads():
         #Check if pad is connected
-        signal = find_signal_for_pad(board, elem, pad)
-        if signal is not None and len(signal.get_contactrefs()) > 1:
-            #Rubout box around pad
-            #Give 0.9mm of rubout space
-            if args.postroute:
-                rubout_maybe(board, pad, args.padding)
-            if args.preroute and not args.no_restrict:
-                restrict_pad(board, pad)
+        if is_pad_connected(board, elem, pad):
+            pads_moved.append(pad)
 
 #Add rubouts for vias
+for via in board.get_signals().get_vias():
+    vias.append(via)
+
+if args.preroute and not args.no_restrict:
+    for pad in pads_moved:
+        restrict_pad(board, pad)
+
 if args.postroute:
-    for via in board.get_signals().get_vias():
+    for via in vias:
+        if args.rivets:
+            assert any(abs(via.get_drill() - d) < 0.002 for d in RIVET_DRILLS), "Invalid drill size {0}mm for via".format(via.get_drill())
         rubout_maybe(board, via, args.padding)
 
+    # Keep track of already processed pads
+    # Some elements have the exact same package and the pads get processed twice
+    processed_pads = set()
+    for elem in board.get_elements():
+        for pad in board.get_libraries().get_package(elem.get_package()).get_pads():
+            if is_pad_connected(board, elem, pad) and args.rivets and pad not in processed_pads:
+                fix_drill_for_rivet(pad)
+                processed_pads.add(pad)
+
+    for pad in pads_moved:
+        rubout_maybe(board, pad, args.padding)
 
 
 board.write(args.outbrd)
