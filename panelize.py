@@ -35,9 +35,15 @@ parser.add_argument("-f","--fit",type=float,
 parser.add_argument("-m","--min-aspect",type=float,default=0.1,
                     help="Minimum aspect ratio when fitting to avoid crazy shapes")
 parser.add_argument("-u","--cutout",action="store_true",
-                    help="Depanelize information. Everything in the dimension layer indicates where to cut. ")
+                    help="Add depanelize information to the dimension layer so the milling machine knows where to cut."
+                         "You'd leave this out when sending it out to 4PCB because they don't allow internal routing."
+                         "This is the final step in the process.")
 parser.add_argument("-t","--tab-size", default=1.5, type=float,
-                    help="The size of the tabs that you have to cut out after the milling process.")
+                    help="The size of the tabs that you have to cut out after the milling process."
+                         "Bigger tabs means each piece will be held together more strongly during the depanelize cuts, "
+                         "but you will have more material to cut by hand.")
+parser.add_argument("-d","--drill-size", default=1.0, type=float,
+                    help="Size of contour router used to cut out the boards when depanelizing is over.")
 args = parser.parse_args()
 
 if args.fit is None and args.rows is None and args.columns is None:
@@ -115,7 +121,7 @@ for i in xrange(rows):
             output.add_signal(moved_sig)
 
 TAB_GAP = args.tab_size
-DRILL = 1.0
+DRILL = args.drill_size
 
 for i in xrange(rows):
     for j in xrange(columns):
