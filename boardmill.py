@@ -21,7 +21,9 @@ parser.add_argument("-o", "--outbrd", required=True)
 parser.add_argument("-r", "--postroute", action="store_true",
                     help="Run after routing. Add rubouts around every pad that has a connection. Makes things easier to solder.")
 parser.add_argument("-rv","--rivets", action="store_true",
-                    help="Use rivets to make vias. This changes the drill diameter of everything to the next largest rivet")
+                    help="Use rivets to make vias. This changes the drill diameter of everything to the next largest rivet."
+                         "This gets applied to all vias. As for pads, it is only applied for where there is a "
+                         "connected trace on the top")
 parser.add_argument("-p", "--padding", required=False, type=float, default=0.9,
                     help="Amount of space (mm) to put around every pad when adding rubouts. Default is 0.9mm")
 parser.add_argument("-t", "--preroute", action="store_true",
@@ -89,28 +91,32 @@ def restrict_pad(board, pad):
 
 # Inner diameter of rivets (mm). The drill size to accommodate must be 0.3mm more
 # Must be in ascending order
-RIVET_SIZES = [0.6, 0.8, 1.0, 1.2]
+RIVET_SIZES =  [0.6, 0.8, 1.0, 1.2]
+RIVET_DRILLS = [0.9, 1.1, 1.5, 1.7]
 
 # If the rivet is just slightly too small (within this tolerance) it may still work
 RIVET_TOLERANCE = 0.020
-RIVET_DRILLS = map(lambda r: r+0.3, RIVET_SIZES)
-RIVET_DRILLS[2] += 0.030        # Long end mill is not very accurate in widening the hole
 
-def fix_drill_for_rivet(pad_or_via):
+def fix_drill_for_rivet(pad_or_via, board_element):
     # Change the drill size of the pad
     new_drill = None
 
     # Find the next largest rivet for the pad
     # Allow for some tolerance wiggle room
-    for rivet in RIVET_SIZES:
+    for i,rivet in enumerate(RIVET_SIZES):
         if rivet + RIVET_TOLERANCE >= pad_or_via.get_drill():
-            new_drill = rivet + 0.3
+            new_drill = RIVET_DRILLS[i]
             break
     if new_drill is None:
-        sys.stderr.write("Cannot use a rivet for pad/via at location {0}. Its drill diameter ({1}mm) is too large\n".
-                         format(pad_or_via.get_point(), pad_or_via.get_drill()))
+        sys.stderr.write("Cannot use a rivet for pad/via at location {l} in component {c}"
+                         ". Its drill diameter ({d}mm) is too large. Forcing bottom soldering instead.\n".
+                         format(l=pad_or_via.get_point(),
+                                d=pad_or_via.get_drill(),
+                                c=elem.get_name()))
+        return False
     else:
         pad_or_via.set_drill(new_drill)
+        return True
 
 
 tRub = Swoop.Layer()
@@ -144,12 +150,12 @@ for s1,s2 in itertools.product(stuff, stuff):
 OTHER_DRC = {
     'msDrill': "0.9mm",  # the smallest a via can be
     'msWidth': "0.6mm",
-    'mdWireVia':'20mil',
-    'mdPadVia':'0.35mm',
-    'mdPadPad':'0.35mm',
-    'mdViaVia':'0.35mm',
+    'mdWireVia':'0.40mm',
+    'mdPadVia':'0.50mm',
+    'mdPadPad':'0.50mm',
+    'mdViaVia':'0.38mm',
     'mdWireWire':'15mil',
-    'mdWirePad':'0.35mm'
+    'mdWirePad':'0.60mm'
 }
 
 for k,v in OTHER_DRC.items():
@@ -168,8 +174,6 @@ AUTOROUTER = {
     'Efforts':'2',
     'RoutingGrid':'25mil'
 }
-
-
 
 
 for apass in board.get_autorouter_passes():
@@ -217,7 +221,7 @@ if args.postroute:
     for elem in board.get_elements():
         for pad in board.get_libraries().get_package(elem.get_package()).get_pads():
             if is_pad_connected(board, elem, pad) and args.rivets and pad not in processed_pads:
-                fix_drill_for_rivet(pad)
+                fix_drill_for_rivet(pad, elem)
                 processed_pads.add(pad)
 
     for pad in pads_moved:
