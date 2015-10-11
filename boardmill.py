@@ -14,6 +14,8 @@ import logging as log
 # Right now it just draws rubouts around connected pads
 # Mirrored stuff is still glitchy
 
+# TODO: transform object representing movement/mirroring/rotation?
+# e.g. package.get_pad().transform(element.get_transform())
 
 parser = argparse.ArgumentParser(description="Helps you prepare a board file for the board mill")
 parser.add_argument("-i", "--inbrd", required=True)
@@ -22,8 +24,8 @@ parser.add_argument("-r", "--postroute", action="store_true",
                     help="Run after routing. Add rubouts around every pad that has a connection. Makes things easier to solder.")
 parser.add_argument("-rv","--rivets", action="store_true",
                     help="Use rivets to make vias. This changes the drill diameter of everything to the next largest rivet."
-                         "This gets applied to all vias. As for pads, it is only applied for where there is a "
-                         "connected trace on the top")
+                         " This gets applied to all vias, but for pads it is only applied when there is a connected trace on "
+                         "the top layer")
 parser.add_argument("-p", "--padding", required=False, type=float, default=0.9,
                     help="Amount of space (mm) to put around every pad when adding rubouts. Default is 0.9mm")
 parser.add_argument("-t", "--preroute", action="store_true",
@@ -137,6 +139,14 @@ bRub.set_visible(True)
 bRub.set_active(True)
 board.add_layer(bRub)
 
+rivet_label = Swoop.Layer()
+rivet_label.set_color(7)
+rivet_label.set_fill(1)
+rivet_label.set_visible(True)
+rivet_label.set_active(True)
+rivet_label.set_number(171)
+rivet_label.set_name("rivetDoc")
+board.add_layer(rivet_label)
 
 # Change DRC settings
 
@@ -229,5 +239,4 @@ if args.postroute:
 
 
 board.write(args.outbrd)
-
 
