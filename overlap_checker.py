@@ -4,20 +4,46 @@
 
 import argparse
 import Swoop.ext.Geometry as SwoopGeom
+from Swoop.ext.Shapes import Rectangle
 import Swoop
+import itertools
+import sys
 
 parser = argparse.ArgumentParser(description="Test that a jet board doesn't have any overlapping components")
 parser.add_argument("boardfile")
 args = parser.parse_args()
 
-brd = Swoop.From(SwoopGeom.WithMixin.from_file(args.boardfile))
-print brd
+brd = SwoopGeom.WithMixin.from_file(args.boardfile)
+# print brd
 
 for elem in brd.get_elements():
-    # print elem
-    print elem.find_package().get_bounding_box()
+    t = elem.get_transform()
+    # print elem.get_name()
+    total_bbox = t.apply(elem.find_package().get_bounding_box())
+    # print total_bbox.eagle_code()
+    pkg = elem.find_package().get_children()
+    # print ""
 
+    for layer in ["tKeepout", "bKeepout"]:
+        setattr(elem, layer + "_bbox", total_bbox)
+        filtered = Swoop.From(pkg).filtered_by(lambda c: hasattr(c, "get_layer") and c.get_layer()==layer)
+        if len(filtered) > 0:
+            bbox = filtered.get_bounding_box().reduce(Rectangle.union)
+            bbox = t.apply(bbox)
+            setattr(elem, layer + "_bbox", bbox)
 
+Good = True
 
+for layer in ["tKeepout","bKeepout"]:
+    for elem1, elem2 in itertools.combinations(brd.get_elements(), 2):
+        if getattr(elem1, layer+"_bbox").overlaps(getattr(elem2, layer+"_bbox")):
+            Good = False
+            sys.stderr.write("{0} overlaps {1} on layer {2}\n".
+                             format(elem1.get_name(), elem2.get_name(), layer))
+
+if Good:
+    sys.exit(0)
+else:
+    sys.exit(-1)
 
 
