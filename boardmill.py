@@ -6,7 +6,7 @@ import Swoop
 import argparse
 import sys
 import itertools
-from Rectangle import Rectangle
+from Swoop.ext.Shapes import Rectangle
 from lxml import etree
 import logging as log
 
