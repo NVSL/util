@@ -4,7 +4,7 @@ import argparse
 import Swoop.ext.Geometry as SG
 import Swoop
 import numpy as np
-from Dingo.Rectangle import Rectangle
+from Swoop.ext.Shapes import Rectangle
 
 
 def process_wire_path(board, to_process_set, point_array):
@@ -79,6 +79,8 @@ args = parser.parse_args()
 board = SG.from_file(args.brdfile)
 
 to_process = set(board.get_plain_elements().with_type(Swoop.Wire))
+
+to_process |= set(board.get_signals().get_wires().with_type(Swoop.Wire))
 
 paths = []
 

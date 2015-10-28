@@ -14,7 +14,6 @@ import logging as log
 # Right now it just draws rubouts around connected pads
 # Mirrored stuff is still glitchy
 
-# TODO: transform object representing movement/mirroring/rotation?
 # e.g. package.get_pad().transform(element.get_transform())
 
 parser = argparse.ArgumentParser(description="Helps you prepare a board file for the board mill")
@@ -36,6 +35,8 @@ parser.add_argument("-n","--no-restrict",action="store_true",
                     help="Don't add any tRestrict so you can solder both sides")
 parser.add_argument("-nv","--no-vrestrict",action="store_true",
                     help="Don't add any vRestrict. Vias will go absolutely anywhere.")
+parser.add_argument("--rubout-all",action="store_true",
+                    help="Rubout all pads and vias on both layers")
 parser.add_argument("-g", "--gspec", help="Gadgetron gspec file for automated options")
 args = parser.parse_args()
 
@@ -72,9 +73,11 @@ def is_pad_connected(board, elem, pad):
     return False
 
 # Place rubout around this element if there are traces nearby
-def rubout_maybe(board, element, padding):
+def rubout_maybe(board, element, padding, override):
     rub_box = element.get_bounding_box().pad(padding)
     rubout_layers = []
+    if override:
+        rubout_layers = ['tRubout', 'bRubout']
     for overlap in board.get_overlapping(rub_box).with_type(Swoop.Wire):
         if overlap.get_layer()=='Top' and 'tRubout' not in rubout_layers:
             rubout_layers.append('tRubout')
@@ -208,7 +211,7 @@ for elem in board.get_elements():
 
     for pad in elem.get_package_moved().get_pads():
         #Check if pad is connected
-        if is_pad_connected(board, elem, pad):
+        if is_pad_connected(board, elem, pad) or args.rubout_all:
             pads_moved.append(pad)
 
 #Add rubouts for vias
@@ -223,7 +226,7 @@ if args.postroute:
     for via in vias:
         if args.rivets:
             assert any(abs(via.get_drill() - d) < 0.002 for d in RIVET_DRILLS), "Invalid drill size {0}mm for via".format(via.get_drill())
-        rubout_maybe(board, via, args.padding)
+        rubout_maybe(board, via, args.padding, args.rubout_all)
 
     # Keep track of already processed pads
     # Some elements have the exact same package and the pads get processed twice
@@ -235,7 +238,7 @@ if args.postroute:
                 processed_pads.add(pad)
 
     for pad in pads_moved:
-        rubout_maybe(board, pad, args.padding)
+        rubout_maybe(board, pad, args.padding, args.rubout_all)
 
 
 board.write(args.outbrd)
