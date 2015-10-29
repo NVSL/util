@@ -4,3 +4,5 @@ default:
 
 clean:
 
+test:
+	true
