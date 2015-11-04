@@ -16,7 +16,9 @@ args = parser.parse_args()
 brd = SwoopGeom.WithMixin.from_file(args.boardfile)
 # print brd
 
-for elem in brd.get_elements():
+locked_elements = Swoop.From(brd.get_elements()).filtered_by(lambda p: p.get_locked())
+
+for elem in locked_elements:
     t = elem.get_transform()
     # print elem.get_name()
     total_bbox = t.apply(elem.find_package().get_bounding_box())
@@ -35,7 +37,7 @@ for elem in brd.get_elements():
 Good = True
 
 for layer in ["tKeepout","bKeepout"]:
-    for elem1, elem2 in itertools.combinations(brd.get_elements(), 2):
+    for elem1, elem2 in itertools.combinations(locked_elements, 2):
         if getattr(elem1, layer+"_bbox").overlaps(getattr(elem2, layer+"_bbox")):
             Good = False
             sys.stderr.write("{0} overlaps {1} on layer {2}\n".
