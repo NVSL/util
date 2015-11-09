@@ -38,6 +38,16 @@ Good = True
 
 for layer in ["tKeepout","bKeepout"]:
     for elem1, elem2 in itertools.combinations(locked_elements, 2):
+        # print elem1.get_name() + " " + elem2.get_name()
+        if elem1.get_name() == "LED1_6_LED" and elem2.get_name() == "L_9_DRIVE":
+            print "HELP"
+            r1 = getattr(elem1, layer+"_bbox")
+            r2 = getattr(elem2, layer+"_bbox")
+            print r1.eagle_code()
+            print r2.eagle_code()
+            print r1,r2
+            print r1.overlaps(r2)
+            print r2.overlaps(r1)
         if getattr(elem1, layer+"_bbox").overlaps(getattr(elem2, layer+"_bbox")):
             Good = False
             sys.stderr.write("{0} overlaps {1} on layer {2}\n".
