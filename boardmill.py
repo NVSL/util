@@ -43,7 +43,7 @@ args = parser.parse_args()
 if not (args.preroute or args.postroute):
     sys.exit("Specify --preroute or --postroute")
 
-board = Swoop.from_file(args.inbrd)
+board = Swoop.BoardFile.open(args.inbrd)
 
 if args.gspec is not None:
     gspec_xml = etree.parse(args.gspec)
