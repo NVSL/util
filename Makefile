@@ -1,9 +1,9 @@
 
 default:
-	./checkpy.py
-
+	pip install -e .
+	./gtron_util/checkpy.py
 clean:
-
+	true
 test:
 	true
 .PHONY: test_dist
