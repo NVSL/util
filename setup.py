@@ -15,6 +15,6 @@ setup(name="gtron_util",
       version=version,
       long_description=long_description,
       author="NVSL, University of California San Diego",
-      install_requires=["bs4"],
+      install_requires=["bs4", 'lxml', 'numpy', 'svgwrite'],
       packages = find_packages()
 )
