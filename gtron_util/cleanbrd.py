@@ -8,18 +8,19 @@
 #   Setting autorouting effort to max, directions to *
 
 import argparse
-import Component
+import hashlib
+import logging as log
+import re
+import sys
+import traceback
+
+import lxml
+from Dingo.Dingo.PlacerBoard import PlacerBoard
 from EagleBoard import EagleBoard
 from lxml import etree as ET
-import numpy as np
-import itertools
-import hashlib
-import re
-import logging as log
-from PlacerBoard import PlacerBoard
-import lxml
-import traceback
-import sys
+
+from GadgetMaker2.GadgetMaker2 import Component
+
 
 def make_wire(start,end):
     w = ET.Element('wire')

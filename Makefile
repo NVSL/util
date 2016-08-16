@@ -1,8 +1,6 @@
+include ../Gadgetron/dev.make
 
-default:
-	./checkpy.py
-
-clean:
-
+.PHONY: test
 test:
 	true
+

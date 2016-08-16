@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 
 import argparse
+
 from EagleBoard import *
-from PlacerBoard import *
+
+from Dingo.Dingo.PlacerBoard import *
 
 parser = argparse.ArgumentParser(description="Count the number of movable parts that actually do something in a brd file")
 parser.add_argument("brdfile")
